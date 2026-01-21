@@ -1,0 +1,23 @@
+{
+  "name": "美股風險控制計算機",
+  "short_name": "風險計算機",
+  "description": "單筆風險% + 組合風險上限% 自動算股數，支援多空與持倉風險管理。",
+  "lang": "zh-Hant",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0a0f1a",
+  "theme_color": "#0a0f1a",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

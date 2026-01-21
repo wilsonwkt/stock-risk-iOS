@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>美股風險控制計算機</title>
+
+  <!-- PWA: 基本設定 -->
+  <meta name="theme-color" content="#0a0f1a" />
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- PWA: Icons（需在專案中準備實際檔案） -->
+  <link rel="icon" href="icons/icon-192.png" sizes="192x192" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <!-- iOS Safari PWA 相關 -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="風險計算機" />
+
+  <style>
+    :root{
+      --bg:#0a0f1a;
+      --card:#0e1626;
+      --text:#e8eefc;
+      --muted:#9aa7c2;
+      --line:rgba(255,255,255,.10);
+      --accent:#3b82f6;
+      --ok:#22c55e;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --radius:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", Arial, sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background: var(--bg);
+      color:var(--text);
+      font-family:var(--sans);
+      line-height:1.55;
+    }
+    .wrap{max-width:980px; margin:28px auto; padding:0 14px;}
+    header{display:flex; flex-direction:column; gap:10px; margin-bottom:14px;}
+    h1{margin:0; font-size:18px; letter-spacing:.2px; font-weight:700;}
+    .sub{color:var(--muted); font-size:13px; margin:0}
+    .topbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between}
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    @media (min-width: 920px){
+      .grid{grid-template-columns: 1.15fr .85fr;}
+    }
+
+    .card{
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      background: rgba(255,255,255,.02);
+    }
+    .hd{
+      padding:12px 14px;
+      border-bottom:1px solid var(--line);
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+    }
+    .hd h2{margin:0; font-size:13px; color:var(--muted); font-weight:700; letter-spacing:.2px;}
+    .bd{padding:14px;}
+
+    .row{display:grid; grid-template-columns: 1fr; gap:10px;}
+    @media (min-width: 520px){ .row.two{grid-template-columns: 1fr 1fr;} }
+
+    label{display:block; font-size:12px; color:var(--muted); margin:0 0 6px;}
+    input, select{
+      width:100%;
+      padding:10px 11px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: transparent;
+      color:var(--text);
+      outline:none;
+    }
+    input:focus, select:focus{
+      border-color: rgba(59,130,246,.85);
+      box-shadow: 0 0 0 3px rgba(59,130,246,.20);
+    }
+
+    .seg{
+      display:flex; gap:8px; flex-wrap:wrap;
+      padding:6px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background: rgba(255,255,255,.02);
+    }
+    .seg button{
+      appearance:none;
+      border:1px solid transparent;
+      background: transparent;
+      color:var(--muted);
+      padding:7px 10px;
+      border-radius:999px;
+      cursor:pointer;
+      font-size:12px;
+      transition: .12s ease;
+    }
+    .seg button[aria-pressed="true"]{
+      color:var(--text);
+      border-color: rgba(59,130,246,.55);
+      background: rgba(59,130,246,.16);
+    }
+
+    .kpis{display:grid; grid-template-columns: 1fr; gap:8px;}
+    @media (min-width: 520px){ .kpis{grid-template-columns: 1fr 1fr;} }
+    .kpi{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.12);
+    }
+    .kpi .t{color:var(--muted); font-size:12px;}
+    .kpi .v{font-family:var(--mono); font-size:15px; margin-top:6px;}
+    .kpi .s{margin-top:6px; font-size:12px; color:var(--muted);}
+
+    .banner{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.12);
+      font-size:13px;
+      color:var(--muted);
+    }
+    .banner.ok{border-color: rgba(34,197,94,.35); background: rgba(34,197,94,.08); color:#d6ffe3;}
+    .banner.bad{border-color: rgba(239,68,68,.35); background: rgba(239,68,68,.10); color:#ffe3e3;}
+    .banner.warn{border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10); color:#fff0d8;}
+
+    .actions{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
+    .btn{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.14);
+      cursor:pointer;
+      font-weight:650;
+      background: rgba(59,130,246,.18);
+      color:var(--text);
+    }
+    .btn.primary{background: rgba(59,130,246,.28); border-color: rgba(59,130,246,.45);}
+    .btn.ghost{background: transparent; color:var(--muted);}
+    .btn:disabled{opacity:.55; cursor:not-allowed;}
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      border-radius:12px;
+      overflow:hidden;
+      border:1px solid var(--line);
+      background: rgba(0,0,0,.10);
+    }
+    th, td{
+      padding:10px 10px;
+      border-bottom:1px solid rgba(255,255,255,.08);
+      text-align:left;
+      font-size:13px;
+    }
+    th{color:var(--muted); font-weight:650; background: rgba(255,255,255,.02);}
+    tr:last-child td{border-bottom:none}
+    .right{text-align:right}
+    .tag{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.10);
+      color: #cfe1ff;
+      font-size:12px;
+      font-family:var(--mono);
+      background: rgba(59,130,246,.10);
+    }
+    .small{font-size:12px;}
+    .muted{color:var(--muted);}
+    .footer{margin-top:10px; color:var(--muted); font-size:12px;}
+    .help{margin-top:6px; color:var(--muted); font-size:12px;}
+
+    /* memory badge */
+    .pill{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      border:1px solid var(--line);
+      padding:6px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.02);
+      color: var(--muted);
+      font-size:12px;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .dot{
+      width:8px;height:8px;border-radius:999px;background:rgba(255,255,255,.25);
+    }
+    .dot.on{background: rgba(34,197,94,.8);}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="topbar">
+        <div>
+          <h1>美股風險控制計算機</h1>
+          <p class="sub">單筆風險% + 組合風險上限% → 自動算股數；支援做多 / 放空。</p>
+        </div>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; justify-content:flex-end">
+          <div class="pill" title="使用瀏覽器 localStorage 記憶資料（僅保存在此裝置/瀏覽器）">
+            <span class="dot" id="memDot"></span>
+            <span id="memText">記憶：—</span>
+          </div>
+
+          <div class="seg" role="group" aria-label="交易方向">
+            <button id="sideLong" type="button" aria-pressed="true">Long</button>
+            <button id="sideShort" type="button" aria-pressed="false">Short</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left -->
+      <section class="card">
+        <div class="hd">
+          <h2>設定 / 新交易</h2>
+          <span class="muted small">極簡模式</span>
+        </div>
+        <div class="bd">
+
+          <div class="row two">
+            <div>
+              <label for="equity">總資金（USD）</label>
+              <input id="equity" type="number" inputmode="decimal" min="0" step="0.01" placeholder="50000" />
+            </div>
+            <div>
+              <label for="perTradePct">單筆風險（%）</label>
+              <input id="perTradePct" type="number" inputmode="decimal" min="0" step="0.01" placeholder="2.5" />
+            </div>
+          </div>
+
+          <div class="row two" style="margin-top:10px;">
+            <div>
+              <label for="portCapPct">組合風險上限（%）</label>
+              <input id="portCapPct" type="number" inputmode="decimal" min="0" step="0.01" placeholder="10" />
+            </div>
+            <div>
+              <label for="sharesMode">股數</label>
+              <select id="sharesMode">
+                <option value="floor" selected>整股</option>
+                <option value="fractional">零股（小數股）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="banner" id="settingsBanner">填入資金與風險比例後，將即時計算可用風險。</div>
+
+          <div class="row two" style="margin-top:12px;">
+            <div>
+              <label for="symbol">代號</label>
+              <input id="symbol" type="text" placeholder="AAPL" />
+            </div>
+            <div>
+              <label for="entry">進場價（USD）</label>
+              <input id="entry" type="number" inputmode="decimal" min="0" step="0.01" placeholder="190.50" />
+              <div class="help" id="entryHelp">Long：止損需低於進場</div>
+            </div>
+          </div>
+
+          <div style="margin-top:10px;">
+            <label>止損模式</label>
+            <div class="seg" role="group" aria-label="止損模式">
+              <button id="modeStopPrice" type="button" aria-pressed="true">止損價</button>
+              <button id="modeStopPct" type="button" aria-pressed="false">固定止損%</button>
+              <button id="modeRiskPerShare" type="button" aria-pressed="false">每股風險$</button>
+            </div>
+          </div>
+
+          <div class="row two" style="margin-top:10px;">
+            <div id="stopPriceBox">
+              <label for="stop">止損價（USD）</label>
+              <input id="stop" type="number" inputmode="decimal" min="0" step="0.01" placeholder="184.00" />
+            </div>
+
+            <div id="stopPctBox" style="display:none;">
+              <label for="stopPct">固定止損（% of entry）</label>
+              <input id="stopPct" type="number" inputmode="decimal" min="0" step="0.01" placeholder="2" />
+              <div class="help">Long：stop = entry × (1 − %)，Short：stop = entry × (1 + %)</div>
+            </div>
+
+            <div id="rpsBox" style="display:none;">
+              <label for="riskPerShare">每股風險（USD）</label>
+              <input id="riskPerShare" type="number" inputmode="decimal" min="0" step="0.01" placeholder="1.50" />
+            </div>
+
+            <div>
+              <label>快速</label>
+              <div class="seg" role="group" aria-label="快速止損%">
+                <button type="button" class="quick" data-pct="1">1%</button>
+                <button type="button" class="quick" data-pct="2">2%</button>
+                <button type="button" class="quick" data-pct="3">3%</button>
+                <button type="button" class="quick" data-pct="5">5%</button>
+              </div>
+              <div class="help">點選會切到「固定止損%」並填入</div>
+            </div>
+          </div>
+
+          <div class="kpis" style="margin-top:12px;">
+            <div class="kpi">
+              <div class="t">單筆可承受虧損</div>
+              <div class="v" id="kpiPerTrade">$0.00</div>
+              <div class="s">= equity × per-trade%</div>
+            </div>
+            <div class="kpi">
+              <div class="t">組合上限 / 已用 / 剩餘</div>
+              <div class="v" id="kpiPortfolio">$0.00</div>
+              <div class="s">cap / used / remain</div>
+            </div>
+            <div class="kpi">
+              <div class="t">本筆：每股風險</div>
+              <div class="v" id="kpiRps">$—</div>
+              <div class="s" id="kpiStop">止損：—</div>
+            </div>
+            <div class="kpi">
+              <div class="t">建議股數 / 本筆風險</div>
+              <div class="v" id="kpiShares">—</div>
+              <div class="s" id="kpiTradeRisk">—</div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="btn primary" id="btnAdd" type="button" disabled>加入持倉</button>
+            <button class="btn ghost" id="btnCopy" type="button">複製</button>
+            <button class="btn ghost" id="btnResetTrade" type="button">清空</button>
+          </div>
+
+          <div class="banner" id="tradeBanner">輸入後會顯示股數與是否超過組合風險上限。</div>
+
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn ghost" id="btnClearMemory" type="button" title="清除本網站記憶（localStorage）">清除記憶</button>
+          </div>
+          <div class="help">記憶內容：設定(資金/風險/股數模式/方向/止損模式) + 持倉清單。</div>
+        </div>
+      </section>
+
+      <!-- Right -->
+      <aside class="card">
+        <div class="hd">
+          <h2>持倉（以止損估算最大虧損）</h2>
+          <span class="muted small" id="sideLabel">方向：Long</span>
+        </div>
+        <div class="bd">
+          <table>
+            <thead>
+              <tr>
+                <th>標的</th>
+                <th class="right">Side</th>
+                <th class="right">Entry</th>
+                <th class="right">Stop</th>
+                <th class="right">R/share</th>
+                <th class="right">Shares</th>
+                <th class="right">Risk$</th>
+                <th class="right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <tr>
+                <td colspan="8" class="muted">尚無持倉。</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="actions">
+            <button class="btn ghost" id="btnExport" type="button">匯出 CSV</button>
+            <button class="btn ghost" id="btnClearAll" type="button">清空持倉</button>
+          </div>
+
+          <div class="footer">
+            <div class="small">公式：<span class="tag">shares = ⌊ (equity×risk%) / |entry−stop| ⌋</span></div>
+            <div class="small muted">提醒：跳空/滑價會使實際虧損高於估算。</div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+<script>
+  // ---------- utilities ----------
+  const $ = (id) => document.getElementById(id);
+  const fmtMoney = (n) => {
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  };
+  const fmtNum = (n, digits=2) => {
+    if (!isFinite(n)) return "—";
+    return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits });
+  };
+
+  // ---------- persistence ----------
+  const STORAGE_KEY = "risk_calc_v1";
+
+  function canUseStorage(){
+    try{
+      const k="__t";
+      localStorage.setItem(k,"1");
+      localStorage.removeItem(k);
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function updateMemoryBadge(){
+    const ok = canUseStorage();
+    const dot = $("memDot");
+    const text = $("memText");
+    dot.classList.toggle("on", ok);
+    text.textContent = ok ? "記憶：已開啟" : "記憶：不可用";
+  }
+
+  function readPersisted(){
+    if (!canUseStorage()) return null;
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || typeof data !== "object") return null;
+      if (data.version !== 1) return null;
+      return data;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function writePersisted(partial){
+    if (!canUseStorage()) return;
+    const current = readPersisted() || { version: 1, savedAt: null, settings: {}, ui: {}, trades: [] };
+    const next = {
+      ...current,
+      ...partial,
+      version: 1,
+      savedAt: Date.now()
+    };
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    }catch(e){
+      // ignore quota / denied
+    }
+  }
+
+  function persistAll(){
+    writePersisted({
+      settings: {
+        equity: $("equity").value,
+        perTradePct: $("perTradePct").value,
+        portCapPct: $("portCapPct").value,
+        sharesMode: $("sharesMode").value
+      },
+      ui: {
+        side,
+        stopMode
+      },
+      trades
+    });
+  }
+
+  // debounce to reduce writes
+  let persistTimer = null;
+  function persistSoon(){
+    clearTimeout(persistTimer);
+    persistTimer = setTimeout(persistAll, 250);
+  }
+
+  function clearMemory(){
+    if (!canUseStorage()) return;
+    if (!confirm("確定要清除記憶？這會刪除設定與持倉清單。")) return;
+    localStorage.removeItem(STORAGE_KEY);
+    updateMemoryBadge();
+  }
+
+  // ---------- state ----------
+  let stopMode = "stop_price"; // stop_price | stop_pct | risk_per_share
+  let side = "long"; // long | short
+  let trades = []; // {id,symbol,side,entry,stop,rps,shares,risk,fractional}
+  const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+  // ---------- read settings ----------
+  function readSettings(){
+    const equity = parseFloat($("equity").value);
+    const perTradePct = parseFloat($("perTradePct").value) / 100.0;
+    const portCapPct = parseFloat($("portCapPct").value) / 100.0;
+    return { equity, perTradePct, portCapPct };
+  }
+
+  function currentPortfolioRisk(){
+    return trades.reduce((s,t)=> s + t.risk, 0);
+  }
+
+  function validateSettings({equity, perTradePct, portCapPct}){
+    const errs = [];
+    if (!(equity > 0)) errs.push("總資金必須 > 0");
+    if (!(perTradePct > 0 && perTradePct <= 0.10)) errs.push("單筆風險% 建議 (0, 10%]（例：2–3%）");
+    if (!(portCapPct > 0 && portCapPct <= 0.30)) errs.push("組合風險上限% 建議 (0, 30%]（例：8–12%）");
+    if (equity > 0 && perTradePct > 0 && portCapPct > 0 && portCapPct < perTradePct) {
+      errs.push("組合風險上限通常應 ≥ 單筆風險%");
+    }
+    return errs;
+  }
+
+  // ---------- compute trade ----------
+  function computeTrade(){
+    const {equity, perTradePct, portCapPct} = readSettings();
+    const errs = validateSettings({equity, perTradePct, portCapPct});
+
+    const entry = parseFloat($("entry").value);
+    const symbolRaw = ($("symbol").value || "").trim().toUpperCase();
+    const symbol = symbolRaw || "—";
+
+    let stop = NaN;
+    let rps = NaN;
+
+    if (!(entry > 0)) errs.push("進場價必須 > 0");
+
+    if (stopMode === "stop_price"){
+      stop = parseFloat($("stop").value);
+      if (!(stop > 0)) errs.push("止損價必須 > 0");
+      if (isFinite(stop) && isFinite(entry)){
+        if (side === "long" && stop >= entry) errs.push("Long：止損價必須 < 進場價");
+        if (side === "short" && stop <= entry) errs.push("Short：止損價必須 > 進場價");
+        rps = Math.abs(entry - stop);
+      }
+    } else if (stopMode === "stop_pct"){
+      const sp = parseFloat($("stopPct").value) / 100.0;
+      if (!(sp > 0 && sp < 1)) errs.push("固定止損% 請輸入 0~100 之間合理值（例如 2）");
+      if (isFinite(entry) && isFinite(sp)) {
+        stop = side === "long"
+          ? entry * (1 - sp)
+          : entry * (1 + sp);
+        rps = Math.abs(entry - stop);
+        if (!(stop > 0)) errs.push("止損價計算結果 <= 0，請調整");
+      }
+    } else if (stopMode === "risk_per_share"){
+      rps = parseFloat($("riskPerShare").value);
+      if (!(rps > 0)) errs.push("每股風險必須 > 0");
+      if (isFinite(entry) && isFinite(rps)) {
+        stop = side === "long" ? (entry - rps) : (entry + rps);
+        if (!(stop > 0)) errs.push("每股風險過大導致止損價 <= 0，請調整");
+      }
+    }
+
+    const perTradeRisk = equity * perTradePct;
+    const portCap = equity * portCapPct;
+    const used = currentPortfolioRisk();
+    const remaining = portCap - used;
+
+    let shares = NaN;
+    let tradeRisk = NaN;
+    const sharesMode = $("sharesMode").value;
+
+    if (errs.length === 0){
+      if (!(rps > 0)) errs.push("每股風險必須 > 0");
+      else{
+        const rawShares = perTradeRisk / rps;
+        shares = (sharesMode === "fractional") ? rawShares : Math.floor(rawShares);
+        if (!(shares > 0)) errs.push(`在單筆風險限制（${fmtMoney(perTradeRisk)}）下，每股風險 ${fmtMoney(rps)} 導致股數=0`);
+        else{
+          tradeRisk = shares * rps;
+          if (used + tradeRisk > portCap){
+            const shares2 = (sharesMode === "fractional")
+              ? Math.max(0, remaining / rps)
+              : Math.floor(Math.max(0, remaining) / rps);
+            errs.push(
+              `加入會超過組合風險上限。剩餘可用 ${fmtMoney(remaining)}；同止損下最多股數：${sharesMode === "fractional" ? fmtNum(shares2, 4) : shares2}`
+            );
+          }
+        }
+      }
+    }
+
+    return {
+      ok: errs.length === 0,
+      errs,
+      preview: { symbol, side, sideLabel: side==="long"?"Long":"Short", entry, stop, rps, shares, tradeRisk, perTradeRisk, portCap, used, remaining }
+    };
+  }
+
+  // ---------- render ----------
+  function render(){
+    const {equity, perTradePct, portCapPct} = readSettings();
+    const settingsErrs = validateSettings({equity, perTradePct, portCapPct});
+
+    const perTradeRisk = (equity>0 && perTradePct>0) ? equity*perTradePct : NaN;
+    const portCap = (equity>0 && portCapPct>0) ? equity*portCapPct : NaN;
+    const used = currentPortfolioRisk();
+    const remaining = isFinite(portCap) ? (portCap - used) : NaN;
+
+    $("kpiPerTrade").textContent = fmtMoney(perTradeRisk);
+    $("kpiPortfolio").textContent = `${fmtMoney(portCap)} / ${fmtMoney(used)} / ${fmtMoney(remaining)}`;
+
+    $("sideLabel").textContent = `方向：${side === "long" ? "Long" : "Short"}`;
+    $("entryHelp").textContent = side === "long" ? "Long：止損需低於進場" : "Short：止損需高於進場";
+
+    const settingsBanner = $("settingsBanner");
+    if (settingsErrs.length){
+      settingsBanner.className = "banner warn";
+      settingsBanner.textContent = settingsErrs.join("；");
+    } else {
+      settingsBanner.className = "banner ok";
+      settingsBanner.textContent = `單筆最多虧損 ${fmtMoney(perTradeRisk)}；組合上限 ${fmtMoney(portCap)}（已用 ${fmtMoney(used)}）。`;
+    }
+
+    const res = computeTrade();
+    const p = res.preview;
+
+    $("kpiRps").textContent = fmtMoney(p.rps);
+    $("kpiStop").textContent = isFinite(p.stop) ? `止損：${fmtMoney(p.stop)}` : "止損：—";
+
+    const sharesMode = $("sharesMode").value;
+    $("kpiShares").textContent = isFinite(p.shares)
+      ? (sharesMode === "fractional" ? `${fmtNum(p.shares, 4)} 股` : `${p.shares} 股`)
+      : "—";
+    $("kpiTradeRisk").textContent = isFinite(p.tradeRisk) ? `本筆風險：${fmtMoney(p.tradeRisk)}` : "—";
+
+    const tradeBanner = $("tradeBanner");
+    if (res.ok){
+      tradeBanner.className = "banner ok";
+      tradeBanner.textContent = `可加入：${p.symbol}（${p.sideLabel}），本筆風險 ${fmtMoney(p.tradeRisk)}；加入後已用 ${fmtMoney(p.used + p.tradeRisk)} / ${fmtMoney(p.portCap)}。`;
+    } else {
+      tradeBanner.className = "banner bad";
+      tradeBanner.textContent = res.errs.join("；");
+    }
+
+    $("btnAdd").disabled = !res.ok;
+
+    renderTable();
+    persistSoon(); // <- any change triggers a save shortly
+  }
+
+  function renderTable(){
+    const tb = $("tbody");
+    if (trades.length === 0){
+      tb.innerHTML = `<tr><td colspan="8" class="muted">尚無持倉。</td></tr>`;
+      return;
+    }
+
+    tb.innerHTML = trades.map((t) => `
+      <tr>
+        <td><span class="tag">${escapeHtml(t.symbol)}</span></td>
+        <td class="right">${t.side === "long" ? "Long" : "Short"}</td>
+        <td class="right">${fmtMoney(t.entry)}</td>
+        <td class="right">${fmtMoney(t.stop)}</td>
+        <td class="right">${fmtMoney(t.rps)}</td>
+        <td class="right">${t.fractional ? fmtNum(t.shares, 4) : t.shares}</td>
+        <td class="right">${fmtMoney(t.risk)}</td>
+        <td class="right">
+          <button class="btn ghost small" type="button" onclick="removeTrade('${t.id}')">移除</button>
+        </td>
+      </tr>
+    `).join("");
+  }
+
+  function escapeHtml(s){
+    return String(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  // ---------- actions ----------
+  function setSide(next){
+    side = next;
+    $("sideLong").setAttribute("aria-pressed", side==="long");
+    $("sideShort").setAttribute("aria-pressed", side==="short");
+    render();
+  }
+
+  function setMode(mode){
+    stopMode = mode;
+    $("modeStopPrice").setAttribute("aria-pressed", mode==="stop_price");
+    $("modeStopPct").setAttribute("aria-pressed", mode==="stop_pct");
+    $("modeRiskPerShare").setAttribute("aria-pressed", mode==="risk_per_share");
+
+    $("stopPriceBox").style.display = mode==="stop_price" ? "" : "none";
+    $("stopPctBox").style.display = mode==="stop_pct" ? "" : "none";
+    $("rpsBox").style.display = mode==="risk_per_share" ? "" : "none";
+
+    render();
+  }
+
+  window.removeTrade = function(id){
+    trades = trades.filter(t => t.id !== id);
+    render();
+  }
+
+  function addTrade(){
+    const res = computeTrade();
+    if (!res.ok) return;
+
+    const p = res.preview;
+    const fractional = $("sharesMode").value === "fractional";
+    trades.push({
+      id: uid(),
+      symbol: p.symbol,
+      side: p.side,
+      entry: p.entry,
+      stop: p.stop,
+      rps: p.rps,
+      shares: p.shares,
+      risk: p.tradeRisk,
+      fractional
+    });
+    render();
+  }
+
+  async function copyResult(){
+    const res = computeTrade();
+    const p = res.preview;
+
+    const sharesMode = $("sharesMode").value;
+    const lines = [
+      `Symbol: ${p.symbol}`,
+      `Side: ${p.side === "long" ? "Long" : "Short"}`,
+      `Entry: ${isFinite(p.entry) ? fmtMoney(p.entry) : "—"}`,
+      `Stop: ${isFinite(p.stop) ? fmtMoney(p.stop) : "—"}`,
+      `Risk/share: ${isFinite(p.rps) ? fmtMoney(p.rps) : "—"}`,
+      `Shares: ${isFinite(p.shares) ? (sharesMode==="fractional" ? fmtNum(p.shares,4) : p.shares) : "—"}`,
+      `Trade risk: ${isFinite(p.tradeRisk) ? fmtMoney(p.tradeRisk) : "—"}`,
+      `Portfolio used: ${fmtMoney(currentPortfolioRisk())}`
+    ];
+    const text = lines.join("\n");
+
+    try{
+      await navigator.clipboard.writeText(text);
+      const b = $("tradeBanner");
+      b.className = "banner ok";
+      b.textContent = "已複製到剪貼簿。";
+      setTimeout(render, 900);
+    } catch(e){
+      alert("複製失敗（瀏覽器限制）。可手動複製 KPI。");
+    }
+  }
+
+  function resetTradeInputs(){
+    $("symbol").value = "";
+    $("entry").value = "";
+    $("stop").value = "";
+    $("stopPct").value = "";
+    $("riskPerShare").value = "";
+    render();
+  }
+
+  function exportCSV(){
+    const rows = [
+      ["symbol","side","entry","stop","risk_per_share","shares","trade_risk_usd"].join(",")
+    ];
+    for (const t of trades){
+      rows.push([t.symbol, t.side, t.entry, t.stop, t.rps, t.shares, t.risk].join(","));
+    }
+    const blob = new Blob([rows.join("\n")], {type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "risk_trades.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearAll(){
+    if (!confirm("確定要清空所有持倉嗎？")) return;
+    trades = [];
+    render();
+  }
+
+  function setQuickPct(pct){
+    $("stopPct").value = String(pct);
+    setMode("stop_pct");
+  }
+
+  // ---------- wire events ----------
+  ["equity","perTradePct","portCapPct","symbol","entry","stop","stopPct","riskPerShare","sharesMode"]
+    .forEach(id => $(id).addEventListener("input", render));
+
+  $("modeStopPrice").addEventListener("click", () => setMode("stop_price"));
+  $("modeStopPct").addEventListener("click", () => setMode("stop_pct"));
+  $("modeRiskPerShare").addEventListener("click", () => setMode("risk_per_share"));
+
+  $("sideLong").addEventListener("click", () => setSide("long"));
+  $("sideShort").addEventListener("click", () => setSide("short"));
+
+  document.querySelectorAll("button.quick").forEach(btn => {
+    btn.addEventListener("click", () => setQuickPct(btn.dataset.pct));
+  });
+
+  $("btnAdd").addEventListener("click", addTrade);
+  $("btnCopy").addEventListener("click", copyResult);
+  $("btnResetTrade").addEventListener("click", resetTradeInputs);
+  $("btnExport").addEventListener("click", exportCSV);
+  $("btnClearAll").addEventListener("click", clearAll);
+  $("btnClearMemory").addEventListener("click", () => { clearMemory(); location.reload(); });
+
+  // ---------- boot ----------
+  updateMemoryBadge();
+
+  // Load from memory (if any), otherwise use defaults
+  const saved = readPersisted();
+  if (saved){
+    const s = saved.settings || {};
+    $("equity").value = (s.equity ?? "50000");
+    $("perTradePct").value = (s.perTradePct ?? "2.5");
+    $("portCapPct").value = (s.portCapPct ?? "10");
+    $("sharesMode").value = (s.sharesMode ?? "floor");
+
+    const ui = saved.ui || {};
+    side = (ui.side === "short") ? "short" : "long";
+    stopMode = (["stop_price","stop_pct","risk_per_share"].includes(ui.stopMode)) ? ui.stopMode : "stop_price";
+
+    trades = Array.isArray(saved.trades) ? saved.trades : [];
+  } else {
+    $("equity").value = "50000";
+    $("perTradePct").value = "2.5";
+    $("portCapPct").value = "10";
+    $("stopPct").value = "2";
+    side = "long";
+    stopMode = "stop_price";
+    trades = [];
+  }
+
+  // Apply UI states then render
+  setMode(stopMode);
+  setSide(side);
+  render();
+
+  // ---------- PWA: 註冊 Service Worker ----------
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js')
+        .catch(err => {
+          console.warn('Service worker 註冊失敗', err);
+        });
+    });
+  }
+</script>
+</body>
+</html>
